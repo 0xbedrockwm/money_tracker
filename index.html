@@ -273,9 +273,7 @@
         </form>
 
         <!-- API Connection Settings Footer -->
-        <div
-          class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500"
-        >
+        <div class="hidden">
           <span id="apiStatusIndicator" class="flex items-center gap-1.5">
             <span
               id="apiStatusDot"
@@ -1743,22 +1741,10 @@
       }
 
       function updateApiStatusUI() {
-        const { url, apiKey } = getApiConfig();
-        const dot = document.getElementById("apiStatusDot");
-        const text = document.getElementById("apiStatusText");
+        const { url } = getApiConfig();
         const banner = document.getElementById("apiMissingBanner");
-
-        document.getElementById("configGasUrlInput").value = url;
-        document.getElementById("configApiKeyInput").value = apiKey;
-
         if (url && url.startsWith("https://script.google.com/")) {
-          dot.className = "h-2.5 w-2.5 rounded-full bg-emerald-500";
-          text.textContent = "เชื่อมต่อ API พร้อมใช้งาน";
           banner.classList.add("hidden");
-        } else {
-          dot.className = "h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse";
-          text.textContent = "ยังไม่ได้ตั้งค่า Web App URL";
-          banner.classList.remove("hidden");
         }
       }
 
