@@ -21,6 +21,7 @@
 
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -653,6 +654,33 @@
                 id="dashboardBudgetList"
                 class="space-y-3.5 max-h-80 overflow-y-auto custom-scrollbar pr-1"
               ></div>
+            </div>
+          </div>
+
+          <!-- Donut Chart: สัดส่วนรายจ่าย/รายรับตามหมวดหมู่ -->
+          <div class="rounded-2xl bg-white p-5 shadow-xs border border-slate-200/80">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">สัดส่วนตามหมวดหมู่</h3>
+                <p class="text-xs text-slate-500">ดูว่าเงินในเดือนที่เลือกไปอยู่กับอะไรบ้าง</p>
+              </div>
+              <div class="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                <button type="button" id="donutTabExpense" onclick="setDonutMode('EXPENSE')"
+                  class="rounded-lg px-3 py-1 text-xs font-semibold bg-white text-rose-600 shadow-xs">รายจ่าย</button>
+                <button type="button" id="donutTabIncome" onclick="setDonutMode('INCOME')"
+                  class="rounded-lg px-3 py-1 text-xs font-semibold text-slate-500">รายรับ</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              <div class="relative mx-auto w-full max-w-xs aspect-square">
+                <canvas id="categoryDonutChart"></canvas>
+                <div id="donutCenter" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <p class="text-[11px] text-slate-400">รวมทั้งหมด</p>
+                  <p id="donutCenterValue" class="text-lg font-bold text-slate-900">฿0.00</p>
+                </div>
+                <p id="donutEmpty" class="hidden absolute inset-0 items-center justify-center text-xs text-slate-400">ยังไม่มีข้อมูลในเดือนนี้</p>
+              </div>
+              <div id="donutLegend" class="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1"></div>
             </div>
           </div>
 
@@ -2024,6 +2052,7 @@
 
         populateSelectDropdowns();
         renderDashboardView();
+        renderDonutChart();
         renderTransactionsPage();
         renderAccountsPage();
         renderCategoriesPage();
@@ -2136,6 +2165,109 @@
             .map((tx) => renderTransactionRowHtml(tx, true))
             .join("");
         }
+      }
+
+      const DONUT_COLORS = [
+        "#6366f1", "#f43f5e", "#10b981", "#f59e0b", "#3b82f6",
+        "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#64748b",
+      ];
+      let donutMode = "EXPENSE";
+      let donutChartInstance = null;
+
+      function setDonutMode(mode) {
+        donutMode = mode;
+        const on = "rounded-lg px-3 py-1 text-xs font-semibold bg-white shadow-xs ";
+        const off = "rounded-lg px-3 py-1 text-xs font-semibold text-slate-500";
+        document.getElementById("donutTabExpense").className =
+          mode === "EXPENSE" ? on + "text-rose-600" : off;
+        document.getElementById("donutTabIncome").className =
+          mode === "INCOME" ? on + "text-emerald-600" : off;
+        renderDonutChart();
+      }
+
+      function renderDonutChart() {
+        const canvas = document.getElementById("categoryDonutChart");
+        if (!canvas || typeof Chart === "undefined") return;
+
+        const totals = {};
+        appState.transactions
+          .filter((t) => t.tx_type === donutMode)
+          .forEach((t) => {
+            const name = t.category_name || "ทั่วไป";
+            totals[name] = (totals[name] || 0) + Number(t.amount || 0);
+          });
+
+        const rows = Object.entries(totals)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value);
+        const total = rows.reduce((s, r) => s + r.value, 0);
+
+        document.getElementById("donutCenterValue").textContent = formatCurrency(total);
+        const emptyEl = document.getElementById("donutEmpty");
+        const centerEl = document.getElementById("donutCenter");
+        const legendEl = document.getElementById("donutLegend");
+
+        if (donutChartInstance) {
+          donutChartInstance.destroy();
+          donutChartInstance = null;
+        }
+
+        if (rows.length === 0) {
+          emptyEl.classList.remove("hidden");
+          emptyEl.classList.add("flex");
+          centerEl.classList.add("hidden");
+          legendEl.innerHTML = "";
+          return;
+        }
+        emptyEl.classList.add("hidden");
+        emptyEl.classList.remove("flex");
+        centerEl.classList.remove("hidden");
+
+        const colors = rows.map((_, i) => DONUT_COLORS[i % DONUT_COLORS.length]);
+
+        donutChartInstance = new Chart(canvas, {
+          type: "doughnut",
+          data: {
+            labels: rows.map((r) => r.name),
+            datasets: [{
+              data: rows.map((r) => r.value),
+              backgroundColor: colors,
+              borderWidth: 2,
+              borderColor: "#ffffff",
+            }],
+          },
+          options: {
+            cutout: "68%",
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                    return ` ${ctx.label}: ${formatCurrency(ctx.parsed)} (${pct}%)`;
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        legendEl.innerHTML = rows
+          .map((r, i) => {
+            const pct = total > 0 ? ((r.value / total) * 100).toFixed(1) : "0.0";
+            return `
+              <div class="flex items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="h-3 w-3 rounded-full shrink-0" style="background-color:${colors[i]}"></span>
+                  <span class="truncate font-medium text-slate-700">${escapeHtml(r.name)}</span>
+                </div>
+                <div class="text-right shrink-0">
+                  <span class="font-bold text-slate-900">${formatCurrency(r.value)}</span>
+                  <span class="ml-1 text-slate-400">${pct}%</span>
+                </div>
+              </div>`;
+          })
+          .join("");
       }
 
       function renderTransactionRowHtml(tx, isCompact = false) {
