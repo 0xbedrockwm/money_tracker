@@ -2764,11 +2764,42 @@
 
       function previewSlip(txId) {
         const tx = appState.transactions.find((t) => t.tx_id === txId);
-        if (!tx || !tx.attachment_url) return;
-        document.getElementById("slipModalImg").src = tx.attachment_url;
+        if (!tx || (!tx.attachment_url && !tx.attachment_id)) return;
+
+        let fileId = tx.attachment_id || "";
+        if (!fileId && tx.attachment_url) {
+          const match = String(tx.attachment_url).match(
+            /(?:id=|\/d\/)([a-zA-Z0-9_-]+)/,
+          );
+          if (match) fileId = match[1];
+        }
+
+        const imgEl = document.getElementById("slipModalImg");
+        const container = imgEl.parentElement;
+        const oldIframe = document.getElementById("slipModalIframe");
+        if (oldIframe) oldIframe.remove();
+
+        imgEl.classList.remove("hidden");
+        imgEl.referrerPolicy = "no-referrer";
+
+        imgEl.onerror = function () {
+          if (fileId) {
+            imgEl.classList.add("hidden");
+            const iframe = document.createElement("iframe");
+            iframe.id = "slipModalIframe";
+            iframe.src = `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`;
+            iframe.className = "w-full h-[60vh] rounded-xl border-0 bg-white";
+            container.appendChild(iframe);
+          }
+        };
+
+        imgEl.src = fileId
+          ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w1000`
+          : tx.attachment_url;
+
         const extLink = document.getElementById("slipExternalLink");
-        extLink.href = tx.attachment_id
-          ? `https://drive.google.com/file/d/${encodeURIComponent(tx.attachment_id)}/view`
+        extLink.href = fileId
+          ? `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`
           : tx.attachment_url;
         openModal("slipModal");
       }
