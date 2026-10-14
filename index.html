@@ -1647,13 +1647,19 @@
         USER_PROFILE: "SET_USER_PROFILE",
       };
 
+      function todayTH() {
+        return new Date(Date.now() + 7 * 3600 * 1000)
+          .toISOString()
+          .substring(0, 10);
+      }
+
       // Application Reactive State
       const appState = {
         token: localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN) || "",
         user: JSON.parse(
           localStorage.getItem(STORAGE_KEYS.USER_PROFILE) || "null",
         ),
-        yearMonth: new Date().toISOString().substring(0, 7),
+        yearMonth: todayTH().substring(0, 7),
         accounts: [],
         categories: [],
         transactions: [],
@@ -2690,9 +2696,7 @@
         document.getElementById("txIdInput").value = "";
         document.getElementById("txModalTitle").textContent =
           "บันทึกรายการใหม่";
-        document.getElementById("txDateInput").value = new Date()
-          .toISOString()
-          .substring(0, 10);
+        document.getElementById("txDateInput").value = todayTH();
         clearSelectedSlip(false);
         populateSelectDropdowns();
         setTransactionType(defaultType);
